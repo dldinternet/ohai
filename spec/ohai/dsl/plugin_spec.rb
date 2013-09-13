@@ -269,13 +269,113 @@ describe Ohai::DSL::Plugin::VersionVII do
         klass.collector.should have_key(platform)
       end
     end
+
+    it "should collect the same data block for multiple platforms" do
+      klass = Ohai.plugin(@name) { collect_data(:windows, :aix) { } }
+      [:aix, :windows].each do |platform|
+        klass.collector.should have_key(platform)
+      end
+    end
   end
 
-  describe "#
+  describe "#run_plugin" do
+    before(:each) do
+      @ohai = Ohai::System.new
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should run the os-specific collect_data block" do
+      klass = Ohai.plugin(@name) { provides "attr"; collect_data(:ubuntu) { attr Mash.new } }
+      plugin = klass.new(@ohai, "plugin.rb")
+      plugin.stub(:collect_os).and_return("ubuntu")
+      plugin.run_plugin
+      @ohai.data.should have_key(:attr)
+      @ohai.data[:attr].should eql({})
+    end
+
+    it "should run the default collect_data block, if no matching platform block" do
+      klass = Ohai.plugin(@name) { provides "attr"; collect_data { attr Mash.new } }
+      plugin = klass.new(@ohai, "plugin.rb")
+      plugin.run_plugin
+      @ohai.data.should have_key(:attr)
+      @ohai.data[:attr].should eql({})
+    end
+
+    it "should run the os-specific collect_data block, if present, not default" do
+      klass = Ohai.plugin(@name) {
+        provides "attr"
+        collect_data { attr "default" }
+        collect_data(:ubuntu) { attr "ubuntu" }
+      }
+      plugin = klass.new(@ohai, "plugin.rb")
+      plugin.stub(:collect_os).and_return("ubuntu")
+      plugin.run_plugin
+      @ohai.data[:attr].should eql("ubuntu")
+    end
+  end
+
+  describe "#provides" do
+    it "should write an [UNSUPPORTED OPERATION] to Ohai::Log.warn" do
+      klass = Ohai.plugin(:Test) { collect_data { provides "attr" } }
+      plugin = klass.new(Ohai::System.new, "")
+      Ohai::Log.should_receive(:warn).with(/provides/)
+      plugin.run_plugin
+      Ohai::NamedPlugin.send(:remove_const, :Test)
+    end
+  end
+
+  describe "#require_plugin" do
+    it "should write a [DEPRECATION] to Ohai::Log.warn" do
+      klass = Ohai.plugin(:Test) { collect_data { require_plugin "other" } }
+      plugin = klass.new(Ohai::System.new, "")
+      Ohai::Log.should_receive(:warn).with(/require_plugin/)
+      plugin.run_plugin
+      Ohai::NamedPlugin.send(:remove_const, :Test)
+    end
+  end
 
   it_behaves_like "Ohai::DSL::Plugin" do
     let(:ohai) { Ohai::System.new }
     let(:source) { "/tmp/plugins/test.rb" }
-    let(:plugin) { Ohai::DSL::Plugin::VersionVII.new(ohai, source) }
+    let(:plugin) { Ohai.plugin(:Test) { }.new(ohai, source) }
+  end
+
+  describe "when written across multiple plugin files" do
+    before(:each) do
+      @ohai = Ohai::System.new
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should collect all provides" do
+      k = Ohai.plugin(@name) { provides "one" }
+      k = Ohai.plugin(@name) { provides "two" }
+      k.provides_attrs.length.should eql(2)
+      k.provides_attrs.should include("one")
+      k.provides_attrs.should include("two")
+    end
+
+    it "should collect all depends" do
+      k = Ohai.plugin(@name) { depends "one" }
+      k = Ohai.plugin(@name) { depends "two" }
+      k.depends_attrs.length.should eql(2)
+      k.depends_attrs.should include("one")
+      k.depends_attrs.should include("two")
+    end
+
+    it "should collect each collect_data block" do
+      k = Ohai.plugin(@name) { collect_data(:ubuntu) { } }
+      k = Ohai.plugin(@name) { collect_data(:darwin) { } }
+      k.collector.keys.length.should eql(2)
+      k.collector.should have_key(:ubuntu)
+      k.collector.should have_key(:darwin)
+    end
   end
 end

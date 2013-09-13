@@ -119,11 +119,14 @@ module Ohai
           end
         end
 
-        def self.collect_data(platform = :default, &block)
-          if collector.has_key?(platform)
-            # warn/error
-          else
-            collector[platform] = block
+        def self.collect_data(*platforms, &block)
+          platforms = [:default] if platforms.empty?
+          platforms.each do |platform|
+            if collector.has_key?(platform)
+              # warn/error
+            else
+              collector[platform] = block
+            end
           end
         end
 
