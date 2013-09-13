@@ -17,6 +17,9 @@
 # limitations under the License.
 #
 
+require 'ohai/mixin/os'
+require 'ohai/mixin/command'
+
 module Ohai
 
   # for plugin namespacing
@@ -33,6 +36,10 @@ module Ohai
       plugin = NamedPlugin.const_set(name, klass)
     end
     plugin
+  end
+
+  def self.v6plugin(&block)
+    klass = Class.new(DSL::Plugin::VersionVI, &block)
   end
 
   # cross platform /dev/null
@@ -52,6 +59,9 @@ module Ohai
 
   module DSL
     class Plugin
+
+      include Ohai::Mixin::Os
+      include Ohai::Mixin::Command
 
       attr_reader :file
       attr_reader :data
@@ -148,7 +158,7 @@ module Ohai
       #==========================================================
       # version 6 plugin class
       #==========================================================
-      class VersionVI
+      class VersionVI < Plugin
 
         attr_reader :version
 
@@ -267,8 +277,7 @@ module Ohai
         begin
           self.run
         rescue => e
-                    Ohai::Log.error("Plugin #{self.source} threw
-                  ##{e.inspect}")
+          Ohai::Log.error("Plugin #{self.file} threw #{e.inspect}")
           e.backtrace.each { |line| Ohai::Log.debug( line )}
         end
       end

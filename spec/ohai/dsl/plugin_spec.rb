@@ -13,7 +13,8 @@
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or  implied.
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
@@ -22,17 +23,17 @@ require File.expand_path("../../../spec_helper", __FILE__)
 
 shared_examples "Ohai::DSL::Plugin" do
   it "should save the plugin source file" do
-    @plugin.source.should eql(source)
+    plugin.file.should eql(source)
   end
 
   it "should set has_run? to false" do
-    @plugin.has_run?.should be_false
+    plugin.has_run?.should be_false
   end
 
   it "should set has_run? to true after running the plugin" do
-    @plugin.stub(:run_plugin).and_return(true)
-    @plugin.run
-    @plugin.has_run?.should be_true
+    plugin.stub(:run_plugin).and_return(true)
+    plugin.run
+    plugin.has_run?.should be_true
   end
 
   context "when accessing data via method_missing" do
@@ -83,177 +84,198 @@ shared_examples "Ohai::DSL::Plugin" do
   end
 end
 
-describe Ohai::DSL::Plugin::VersionVII do
-  describe "when loaded" do
-    describe "#self.provides_attrs" do
-      before(:all) do
-        @provides_one = Ohai.plugin { provides("thing") }
-        @provides_list = Ohai.plugin { provides("thing", "something", "otherthing") }
-        @provides_many = Ohai.plugin { provides("list", "something"); provides("somethingelse") }
-      end
-
-      it "should collect a single attribute" do
-        @provides_one.provides_attrs.should eql(["thing"])
-      end
-
-      it "should collect a list of attributes" do
-        @provides_list.provides_attrs.should eql(["thing", "something", "otherthing"])
-      end
-
-      it "should collect from multiple provides statements" do
-        @provides_many.provides_attrs.should eql(["list", "something", "somethingelse"])
-      end
-    end
-
-    describe "#self.depends_attrs" do
-      before(:all) do
-        @depends_none = Ohai.plugin { }
-        @depends_one = Ohai.plugin { depends("other") }
-        @depends_list = Ohai.plugin { depends("on", "list") }
-        @depends_many = Ohai.plugin { depends("on", "list"); depends("single") }
-      end
-
-      it "should return an empty array if no dependencies" do
-        @depends_none.depends_attrs.should be_empty
-      end
-
-      it "should collect a single dependency" do
-        @depends_one.depends_attrs.should eql(["other"])
-      end
-
-      it "should collect a list of dependencies" do
-        @depends_list.depends_attrs.should eql(["on", "list"])
-      end
-
-      it "should collect from multiple depends statements" do
-        @depends_many.depends_attrs.should eql(["on", "list", "single"])
-      end
-    end
-
-    describe "#self.depends_os" do
-      before(:all) do
-        Ohai::OS.stub(:collect_os).and_return("ubuntu")
-        @depends_os = Ohai.plugin { depends_os("specific") }
-      end
-
-      it "should append the OS to the attribute" do
-        @depends_os.depends_attrs.should eql(["ubuntu/specific"])
-      end
-    end
-
-    describe "#self.collect_data" do
-      before(:all) do
-        @no_collect_data = Ohai.plugin { }
-        @collect_data = Ohai.plugin { provides "math"; collect_data { math("is awesome") } }
-      end
-
-      it "should not define run_plugin if no collect data block exists" do
-        @no_collect_data.method_defined?(:run_plugin).should be_false
-      end
-
-      it "should define run_plugin if a collect data block exists" do
-        @collect_data.method_defined?(:run_plugin).should be_true
-      end
-    end
-
-    it "should raise a NoMethodError when encountering \'require_plugin\'" do
-      bad_plugin_string = <<EOF
-Ohai.plugin do
-  require_plugin "other"
-end
-EOF
-      expect { eval(bad_plugin_string, TOPLEVEL_BINDING) }.to raise_error(NoMethodError)
-    end
-
-    it "should log a deprecation warning when calling require_plugin from collect_data" do
-      klass = Ohai.plugin { provides("bad"); collect_data { require_plugin("other") } }
-      plugin = klass.new(Ohai::System.new, "/tmp/plugins/bad_plugin.rb")
-      Ohai::Log.should_receive(:warn).with(/[UNSUPPORTED OPERATION]+\'require_plugin\'/)
-      plugin.run
-    end
-  end
-
-  describe "when initialized" do
-    before(:each) do
-      @ohai = Ohai::System.new
-      @source = "/tmp/plugins/simple.rb"
-      @plugin = Ohai::DSL::Plugin::VersionVII.new(@ohai, @source)
-    end
-
-    it "should be a :version7 plugin" do
-      @plugin.version.should eql(:version7)
-    end
-
-    it "should log a deprecation warning when calling require_plugin from collect_data" do
-      bad_plugin_string = <<EOF
-Ohai.plugin do
-  provides "bad"
-  collect_data do
-    require_plugin "other"
-  end
-end
-EOF
-      klass = eval(bad_plugin_string, TOPLEVEL_BINDING)
-      plugin = klass.new(@ohai, "/tmp/plugins/bad_plugin.rb")
-      Ohai::Log.should_receive(:warn).with(/[UNSUPPORTED OPERATION]+\'require_plugin\'/)
-      plugin.run
-    end
-
-    it "should log a deprecation warning when calling provides from collect_data" do
-      bad_plugin_string = <<EOF
-Ohai.plugin do
-  collect_data do
-    provides "bad"
-  end
-end
-EOF
-      klass = eval(bad_plugin_string, TOPLEVEL_BINDING)
-      plugin = klass.new(@ohai, "/tmp/plugins/bad_plugin.rb")
-      Ohai::Log.should_receive(:warn).with(/[UNSUPPORTED OPERATION]+\'provides\'/)
-      plugin.run
-    end
-
-    it_behaves_like "Ohai::DSL::Plugin" do
-      let(:ohai) { @ohai }
-      let(:source) { @source }
-      let(:plugin) { @plugin }
-    end
-  end
-end
-
 describe Ohai::DSL::Plugin::VersionVI do
-  describe "when loaded" do
-    before(:all) do
-      @contents = <<EOF
-provides "thing"
-depends "otherthing"
-
-thing "gets set"
-end
-EOF
-    end
-
-    it "should define run_plugin with contents string" do
-      klass = Ohai.v6plugin { collect_contents(@contents) }
-      klass.method_defined?(:run_plugin).should be_true
+  describe "#version" do
+    it "should return :version6" do
+      Ohai::DSL::Plugin::VersionVI.new(Ohai::System.new, "").version.should eql(:version6)
     end
   end
 
-  describe "when initialized" do
+  describe "#provides" do
     before(:each) do
       @ohai = Ohai::System.new
-      @source = "/tmp/plugins/simple.rb"
-      @plugin = Ohai::DSL::Plugin::VersionVI.new(@ohai, @source)
     end
 
-    it "should be a :version6 plugin" do
-      @plugin.version.should eql(:version6)
+    it "should add a provided attribute to Ohai" do
+      klass = Ohai.v6plugin { collect_contents("provides(\"attr\")") }
+      plugin = klass.new(@ohai, "")
+      plugin.run_plugin
+
+      @ohai.attributes.should have_key(:attr)
     end
 
-    it_behaves_like "Ohai::DSL::Plugin" do
-      let(:ohai) { @ohai }
-      let(:source) { @source }
-      let(:plugin) { @plugin }
+    it "should save the provider for an attribute" do
+      klass = Ohai.v6plugin { collect_contents("provides(\"attr\")") }
+      plugin = klass.new(@ohai, "")
+      plugin.run_plugin
+
+      @ohai.attributes[:attr][:_providers].should include(plugin)
     end
+
+    it "should save each provider for an attribute" do
+      klass = Ohai.v6plugin { collect_contents("provides(\"attr\")") }
+      plugin1 = klass.new(@ohai, "")
+      plugin2 = klass.new(@ohai, "")
+
+      plugin1.run_plugin
+      plugin2.run_plugin
+
+      [plugin1, plugin2].each do |plugin|
+        @ohai.attributes[:attr][:_providers].should include(plugin)
+      end
+    end
+
+    it "should save multi-level attributes (i.e., attr/subattr)" do
+      klass = Ohai.v6plugin { collect_contents("provides(\"attr/subattr\")") }
+      plugin = klass.new(@ohai, "")
+      plugin.run_plugin
+
+      @ohai.attributes.should have_key(:attr)
+      @ohai.attributes[:attr].should have_key(:subattr)
+    end
+
+    it "should save the provider for a multi-level attribute" do
+      klass = Ohai.v6plugin { collect_contents("provides(\"attr/subattr\")") }
+      plugin = klass.new(@ohai, "")
+      plugin.run_plugin
+
+      @ohai.attributes[:attr][:subattr][:_providers].should include(plugin)
+    end
+  end
+
+  describe "#require_plugin" do
+    before(:each) do
+      @ohai = Ohai::System.new
+    end
+
+    it "should require the plugin through Ohai::System" do
+      klass = Ohai.v6plugin { collect_contents("require_plugin(\'other\')") }
+      plugin = klass.new(@ohai, "")
+
+      @ohai.should_receive(:require_plugin).with(['other'])
+      plugin.run_plugin
+    end
+
+    it "should require each plugin through Ohai::System" do
+      klass = Ohai.v6plugin { collect_contents("require_plugin(\'some\', \'other\', \'plugin\')") }
+      plugin = klass.new(@ohai, "")
+
+      @ohai.should_receive(:require_plugin).with(['some', 'other', 'plugin'])
+      plugin.run_plugin
+    end
+  end
+
+  describe "#self.collect_contents" do
+    it "should define run_plugin" do
+      klass = Ohai.v6plugin { collect_contents("") }
+      klass.method_defined?(:run_plugin)
+    end
+  end
+
+  it_behaves_like "Ohai::DSL::Plugin" do
+    let(:ohai) { Ohai::System.new }
+    let(:source) { "/tmp/plugins/test.rb" }
+    let(:plugin) { Ohai::DSL::Plugin::VersionVI.new(ohai, source) }
+  end
+end
+
+describe Ohai::DSL::Plugin::VersionVII do
+  describe "#version" do
+    it "should return :version7" do
+      Ohai::DSL::Plugin::VersionVII.new(Ohai::System.new, "").version.should eql(:version7)
+    end
+  end
+
+  describe "#self.provides" do
+    before(:each) do
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should collect a single attribute" do
+      klass = Ohai.plugin(@name) { provides("attr") }
+      klass.provides_attrs.should include("attr")
+    end
+
+    it "should collect a list of attributes" do
+      klass = Ohai.plugin(@name) { provides("attr1", "attr2") }
+      %w{ attr1 attr2 }.each do |attr|
+        klass.provides_attrs.should include(attr)
+      end
+    end
+
+    it "should collect from multiple provides statements" do
+      klass = Ohai.plugin(@name) { provides("attr1"); provides("attr2", "attr3") }
+      %w{ attr1 attr2 attr3 }.each do |attr|
+        klass.provides_attrs.should include(attr)
+      end
+    end
+  end
+
+  describe "#self.depends" do
+    before(:each) do
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should collect a single dependency" do
+      klass = Ohai.plugin(@name) { depends("attr") }
+      klass.depends_attrs.should include("attr")
+    end
+
+    it "should collect a list of dependencies" do
+      klass = Ohai.plugin(@name) { depends("attr1", "attr2") }
+      %w{ attr1 attr2 }.each do |attr|
+        klass.depends_attrs.should include(attr)
+      end
+    end
+
+    it "should collect from multiple depends statments" do
+      klass = Ohai.plugin(@name) { depends("attr1"); depends("attr2", "attr3") }
+      %w{ attr1 attr2 attr3 }.each do |attr|
+        klass.depends_attrs.should include(attr)
+      end
+    end
+  end
+
+  describe "#self.collect_data" do
+    before(:each) do
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should set platform as :default if no platform is specified" do
+      klass = Ohai.plugin(@name) { collect_data { } }
+      klass.collector.should have_key(:default)
+    end
+
+    it "should set :platform, when provided" do
+      klass = Ohai.plugin(@name) { collect_data(:ubuntu) { } }
+      klass.collector.should have_key(:ubuntu)
+    end
+
+    it "should collect from multiple collect data blocks (unique platforms)" do
+      klass = Ohai.plugin(@name) { collect_data(:darwin) { }; collect_data(:default) { }; collect_data(:ubuntu) { } }
+      [:darwin, :default, :ubuntu].each do |platform|
+        klass.collector.should have_key(platform)
+      end
+    end
+  end
+
+  describe "#
+
+  it_behaves_like "Ohai::DSL::Plugin" do
+    let(:ohai) { Ohai::System.new }
+    let(:source) { "/tmp/plugins/test.rb" }
+    let(:plugin) { Ohai::DSL::Plugin::VersionVII.new(ohai, source) }
   end
 end
