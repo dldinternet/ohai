@@ -17,17 +17,22 @@
 # limitations under the License.
 #
 
-require 'ohai/os'
-require 'ohai/mixin/command'
-require 'ohai/mixin/seconds_to_human'
-
 module Ohai
-  def self.plugin(&block)
-    Class.new(DSL::Plugin::VersionVII, &block)
+
+  # for plugin namespacing
+  module NamedPlugin
   end
 
-  def self.v6plugin(&block)
-    Class.new(DSL::Plugin::VersionVI, &block)
+  def self.plugin(name, &block)
+    plugin = nil
+    if NamedPlugin.const_defined?(name)
+      plugin = NamedPlugin.const_get(name)
+      plugin.class_eval(&block)
+    else
+      klass = Class.new(DSL::Plugin::VersionVII, &block)
+      plugin = NamedPlugin.const_set(name, klass)
+    end
+    plugin
   end
 
   # cross platform /dev/null
@@ -39,60 +44,45 @@ module Ohai
     end
   end
 
-  # this methods gets overridden at test time, to force the shell to check
-  # ohai/spec/unit/path/original/absolute/path/to/exe
-  def self.abs_path( abs_path )
+  # this method gets overridden at test time, to force the shell to
+  # check ohai/spec/unit/path/original/absolute/path/to/exec
+  def self.abs_path(abs_path)
     abs_path
   end
 
   module DSL
     class Plugin
-      include Ohai::OS
-      include Ohai::Mixin::Command
-      include Ohai::Mixin::SecondsToHuman
 
+      attr_reader :file
       attr_reader :data
-      attr_reader :source
 
-      def initialize(controller, source)
+      def initialize(controller, file)
         @controller = controller
-        @attributes = controller.attributes
         @data = controller.data
-        @source = source
+        @attributes = controller.attributes
+        @file = file
         @has_run = false
       end
 
       def run
-        @has_run = true
         run_plugin
+        @has_run = true
       end
 
       def has_run?
         @has_run
       end
 
-      #=====================================================
+      #==========================================================
       # version 7 plugin class
-      #=====================================================
+      #==========================================================
       class VersionVII < Plugin
+
+        attr_reader :version
+
         def initialize(controller, source)
           super(controller, source)
-        end
-
-        def version
-          :version7
-        end
-
-        def dependencies
-          self.class.depends_attrs
-        end
-
-        def provides(*paths)
-          Ohai::Log.warn("[UNSUPPORTED OPERATION] \'provides\' is no longer supported in a \'collect_data\' context. Please specify \'provides\' before collecting plugin data. Ignoring command \'provides #{paths.join(", ")}")
-        end
-
-        def require_plugin(*args)
-          Ohai::Log.warn("[UNSUPPORTED OPERATION] \'require_plugin\' is no longer supported. Please use \'depends\' instead.\nIgnoring plugin(s) #{args.join(", ")}")
+          @version = :version7
         end
 
         def self.provides_attrs
@@ -101,6 +91,10 @@ module Ohai
 
         def self.depends_attrs
           @depends_attrs ||= []
+        end
+
+        def self.collector
+          @collector ||= Mash.new
         end
 
         def self.provides(*attrs)
@@ -115,32 +109,61 @@ module Ohai
           end
         end
 
-        def self.depends_os(*attrs)
-          attrs.each do |attr|
-            depends_attrs << "#{Ohai::OS.collect_os}/#{attr}"
+        def self.collect_data(platform = :default, &block)
+          if collector.has_key?(platform)
+            # warn/error
+          else
+            collector[platform] = block
           end
         end
 
-        def self.collect_data(&block)
-          define_method(:run_plugin, &block)
+        def dependencies
+          self.class.depends_attrs
         end
+
+        def run_plugin
+          collector = self.class.collector
+          platform = collect_os
+
+          if collector.has_key?(platform)
+            self.instance_eval(&collector[platform])
+          elsif collector.has_key?(:default)
+            self.instance_eval(&collector[:default])
+          else
+            # warn/error no collect_data block defined
+            # nothing to do here
+          end
+        end
+
+        def provides(*paths)
+          Ohai::Log.warn("[UNSUPPORTED OPERATION] \'provides\' is not supported within \'collect_data\'. Please declare provided attributes before collecting plugin data. The following attribute(s) will not be provided by this plugin: #{paths.join(", ")}")
+        end
+
+        def require_plugin(*args)
+          Ohai::Log.warn("[DEPRECATION] \'require_plugin\' is no longer supported. Please use \'depends\' before collecting plugin data. The following plugin(s) will be ignored here: #{args.join(", ")}")
+        end
+
       end
 
-      #=====================================================
+      #==========================================================
       # version 6 plugin class
-      #=====================================================
-      class VersionVI < Plugin
+      #==========================================================
+      class VersionVI
+
+        attr_reader :version
+
         def initialize(controller, source)
           super(controller, source)
+          @version = :version6
         end
 
-        def version
-          :version6
+        def self.collect_contents(contents)
+          define_method(:run_plugin) { self.instance_eval(contents) }
         end
 
         def provides(*paths)
           paths.each do |path|
-            parts = path.split("/")
+            parts = path.split('/')
             a = @attributes
             unless parts.length == 0
               parts.shift if parts[0].length == 0
@@ -149,23 +172,20 @@ module Ohai
                 a = a[part]
               end
             end
-            a[:providers] ||= []
-            a[:providers] << self
+            a[:_providers] ||= []
+            a[:_providers] << self
           end
         end
 
         def require_plugin(*args)
-          @controller.require_plugin(*args)
+          @controller.require_plugin(args)
         end
 
-        def self.collect_contents(contents)
-          define_method(:run_plugin) { self.instance_eval(contents) }
-        end
       end
 
-      #=====================================================
-      # plugin DSL methods
-      #=====================================================
+      #==========================================================
+      # DSL plugin command
+      #==========================================================
       def hints
         @controller.hints
       end
@@ -198,9 +218,8 @@ module Ohai
         stdout.strip
       end
 
-      # Set the value equal to the stdout of the command, plus
-      # run through a regex - the first piece of match data is\
-      # the value.
+      # Set the value equal to the stdout of the command, plus run
+      # through a regex - the first piece of match data is the value.
       def from_with_regex(cmd, *regex_list)
         regex_list.flatten.each do |regex|
           status, stdout, stderr = run_command(:command => cmd)
@@ -231,7 +250,8 @@ module Ohai
             begin
               hash = @json_parser.parse(File.read(filename))
               hints[name] = hash || Hash.new # hint
-              # should exist because the file did, even if it didn't
+                            # should exist because the file did, even
+              # if it didn't
               # contain anything
             rescue Yajl::ParseError => e
               Ohai::Log.error("Could not parse hint file at #{filename}: #{e.message}")
@@ -247,7 +267,8 @@ module Ohai
         begin
           self.run
         rescue => e
-          Ohai::Log.error("Plugin #{self.class.name} threw #{e.inspect}")
+                    Ohai::Log.error("Plugin #{self.source} threw
+                  ##{e.inspect}")
           e.backtrace.each { |line| Ohai::Log.debug( line )}
         end
       end
@@ -265,6 +286,8 @@ module Ohai
         return args.first if args.length == 1
         return *args
       end
+      
     end
+
   end
 end
