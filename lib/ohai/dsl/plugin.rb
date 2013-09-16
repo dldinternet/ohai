@@ -28,18 +28,44 @@ module Ohai
 
   def self.plugin(name, &block)
     plugin = nil
-    if NamedPlugin.const_defined?(name)
-      plugin = NamedPlugin.const_get(name)
-      plugin.class_eval(&block)
+    plugin_name = nameify(name)
+    if NamedPlugin.const_defined?(plugin_name)
+      plugin = NamedPlugin.const_get(plugin_name)
+      if plugin.version.eql?(:version6)
+        Ohai::Log.debug("Already loaded plugin #{plugin_name.to_s}")
+      else
+        plugin.class_eval(&block)
+      end
     else
       klass = Class.new(DSL::Plugin::VersionVII, &block)
-      plugin = NamedPlugin.const_set(name, klass)
+      plugin = NamedPlugin.const_set(plugin_name, klass)
     end
     plugin
   end
 
-  def self.v6plugin(&block)
-    klass = Class.new(DSL::Plugin::VersionVI, &block)
+  def self.v6plugin(name, &block)
+    plugin = nil
+    plugin_name = nameify(name)
+    if NamedPlugin.const_defined?(plugin_name)
+      plugin = NamedPlugin.const_get(plugin_name)
+      Ohai::Log.debug("Already loaded plugin #{plugin_name.to_s}")
+    else
+      klass = Class.new(DSL::Plugin::VersionVI, &block)
+      plugin = NamedPlugin.const_set(plugin_name, klass)
+    end
+    plugin
+  end
+
+  def self.nameify(n)
+    parts = n.to_s.split(/[^a-zA-Z0-9]/)
+    name = ""
+    parts.each do |part|
+      next if part.eql?("")
+      name << part.capitalize
+    end
+
+    raise ArgumentError, "Invalid plugin name: #{string}" if name.eql?("")
+    name.to_sym
   end
 
   # cross platform /dev/null
@@ -95,6 +121,10 @@ module Ohai
           @version = :version7
         end
 
+        def self.version
+          :version7
+        end
+
         def self.provides_attrs
           @provides_attrs ||= []
         end
@@ -123,7 +153,7 @@ module Ohai
           platforms = [:default] if platforms.empty?
           platforms.each do |platform|
             if collector.has_key?(platform)
-              # warn/error
+              Ohai::Log.warn("Already defined collect_data on platform #{platform.to_s}")
             else
               collector[platform] = block
             end
@@ -143,8 +173,7 @@ module Ohai
           elsif collector.has_key?(:default)
             self.instance_eval(&collector[:default])
           else
-            # warn/error no collect_data block defined
-            # nothing to do here
+            Ohai::Log.warn("No data to collect for plugin #{self.name}. Continuing...")
           end
         end
 
@@ -168,6 +197,10 @@ module Ohai
         def initialize(controller, source)
           super(controller, source)
           @version = :version6
+        end
+
+        def self.version
+          :version6
         end
 
         def self.collect_contents(contents)
@@ -298,7 +331,7 @@ module Ohai
         return args.first if args.length == 1
         return *args
       end
-      
+
     end
 
   end

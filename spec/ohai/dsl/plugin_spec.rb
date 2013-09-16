@@ -94,10 +94,15 @@ describe Ohai::DSL::Plugin::VersionVI do
   describe "#provides" do
     before(:each) do
       @ohai = Ohai::System.new
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
     end
 
     it "should add a provided attribute to Ohai" do
-      klass = Ohai.v6plugin { collect_contents("provides(\"attr\")") }
+      klass = Ohai.v6plugin(@name) { collect_contents("provides(\"attr\")") }
       plugin = klass.new(@ohai, "")
       plugin.run_plugin
 
@@ -105,7 +110,7 @@ describe Ohai::DSL::Plugin::VersionVI do
     end
 
     it "should save the provider for an attribute" do
-      klass = Ohai.v6plugin { collect_contents("provides(\"attr\")") }
+      klass = Ohai.v6plugin(@name) { collect_contents("provides(\"attr\")") }
       plugin = klass.new(@ohai, "")
       plugin.run_plugin
 
@@ -113,7 +118,7 @@ describe Ohai::DSL::Plugin::VersionVI do
     end
 
     it "should save each provider for an attribute" do
-      klass = Ohai.v6plugin { collect_contents("provides(\"attr\")") }
+      klass = Ohai.v6plugin(@name) { collect_contents("provides(\"attr\")") }
       plugin1 = klass.new(@ohai, "")
       plugin2 = klass.new(@ohai, "")
 
@@ -126,7 +131,7 @@ describe Ohai::DSL::Plugin::VersionVI do
     end
 
     it "should save multi-level attributes (i.e., attr/subattr)" do
-      klass = Ohai.v6plugin { collect_contents("provides(\"attr/subattr\")") }
+      klass = Ohai.v6plugin(@name) { collect_contents("provides(\"attr/subattr\")") }
       plugin = klass.new(@ohai, "")
       plugin.run_plugin
 
@@ -135,7 +140,7 @@ describe Ohai::DSL::Plugin::VersionVI do
     end
 
     it "should save the provider for a multi-level attribute" do
-      klass = Ohai.v6plugin { collect_contents("provides(\"attr/subattr\")") }
+      klass = Ohai.v6plugin(@name) { collect_contents("provides(\"attr/subattr\")") }
       plugin = klass.new(@ohai, "")
       plugin.run_plugin
 
@@ -146,10 +151,15 @@ describe Ohai::DSL::Plugin::VersionVI do
   describe "#require_plugin" do
     before(:each) do
       @ohai = Ohai::System.new
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
     end
 
     it "should require the plugin through Ohai::System" do
-      klass = Ohai.v6plugin { collect_contents("require_plugin(\'other\')") }
+      klass = Ohai.v6plugin(@name) { collect_contents("require_plugin(\'other\')") }
       plugin = klass.new(@ohai, "")
 
       @ohai.should_receive(:require_plugin).with(['other'])
@@ -157,7 +167,7 @@ describe Ohai::DSL::Plugin::VersionVI do
     end
 
     it "should require each plugin through Ohai::System" do
-      klass = Ohai.v6plugin { collect_contents("require_plugin(\'some\', \'other\', \'plugin\')") }
+      klass = Ohai.v6plugin(@name) { collect_contents("require_plugin(\'some\', \'other\', \'plugin\')") }
       plugin = klass.new(@ohai, "")
 
       @ohai.should_receive(:require_plugin).with(['some', 'other', 'plugin'])
@@ -166,9 +176,33 @@ describe Ohai::DSL::Plugin::VersionVI do
   end
 
   describe "#self.collect_contents" do
+    before(:each) do
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
     it "should define run_plugin" do
-      klass = Ohai.v6plugin { collect_contents("") }
+      klass = Ohai.v6plugin(@name) { collect_contents("") }
       klass.method_defined?(:run_plugin)
+    end
+  end
+
+  describe "when a v6 plugin with the same name already exists" do
+    before(:each) do
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should write a message to debug" do
+      Ohai.v6plugin(@name) { }
+      Ohai::Log.should_receive(:debug).with(/Already loaded plugin/)
+      Ohai.v6plugin(@name) { }
     end
   end
 
@@ -341,7 +375,7 @@ describe Ohai::DSL::Plugin::VersionVII do
   it_behaves_like "Ohai::DSL::Plugin" do
     let(:ohai) { Ohai::System.new }
     let(:source) { "/tmp/plugins/test.rb" }
-    let(:plugin) { Ohai.plugin(:Test) { }.new(ohai, source) }
+    let(:plugin) { Ohai::DSL::Plugin::VersionVII.new(ohai, source) }
   end
 
   describe "when written across multiple plugin files" do
@@ -352,6 +386,12 @@ describe Ohai::DSL::Plugin::VersionVII do
 
     after(:each) do
       Ohai::NamedPlugin.send(:remove_const, @name)
+    end
+
+    it "should log to debug if the a v6 plugin with the same name already defined" do
+      Ohai.v6plugin(@name) { }
+      Ohai::Log.should_receive(:debug).with(/Already loaded plugin/)
+      Ohai.plugin(@name) { }
     end
 
     it "should collect all provides" do
