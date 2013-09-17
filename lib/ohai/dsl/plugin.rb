@@ -64,7 +64,7 @@ module Ohai
       name << part.capitalize
     end
 
-    raise ArgumentError, "Invalid plugin name: #{string}" if name.eql?("")
+    raise ArgumentError, "Invalid plugin name: #{n}" if name.eql?("")
     name.to_sym
   end
 

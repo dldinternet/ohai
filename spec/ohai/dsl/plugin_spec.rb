@@ -419,3 +419,25 @@ describe Ohai::DSL::Plugin::VersionVII do
     end
   end
 end
+
+describe Ohai::DSL::Plugin, "#nameify" do
+  it "should keep a valid symbol name" do
+    s = :Name
+    n = Ohai.nameify(s)
+    n.should eql(s)
+  end
+
+  it "should convert a valid string name to a symbol" do
+    n = Ohai.nameify("Name")
+    n.should eql(:Name)
+  end
+
+  it "should convert a file extention to a valid name symbol" do
+    n = Ohai.nameify("plugin/name")
+    n.should eql(:PluginName)
+  end
+
+  it "should raise an ArgumentError if the string cannot be converted to a name" do
+    expect{ Ohai.nameify("::") }.to raise_error(ArgumentError)
+  end
+end
