@@ -19,14 +19,11 @@
 
 require 'ohai/mixin/ec2_metadata'
 
-Ohai.plugin do
+Ohai.plugin(:Ec2) do
   include Ohai::Mixin::Ec2Metadata
   
   provides "ec2"
-
-  depends "fqdn", "domain"
-  depends "kernel"
-  depends "network", "counters/network"
+  depends "network/interfaces"
 
   def has_ec2_mac?
     network[:interfaces].values.each do |iface|

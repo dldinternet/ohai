@@ -16,10 +16,13 @@
 # limitations under the License.
 #
 
-Ohai.plugin do
+require 'ohai/common/platform'
+
+Ohai.plugin(:Platform) do
+  include Ohai::Common::Platform
   provides "platform", "platform_version", "platform_build"
 
-  collect_data do
+  collect_data(:solaris2) do
     if File.exists?("/sbin/uname")
       uname_exec = "/sbin/uname"
     else
@@ -59,5 +62,9 @@ Ohai.plugin do
         end
       end
     end
+
+    platform get_platform unless attribute?(platform)
+    platform_version get_platform_version unless attribute?(get_platform_version)
+    platform_family get_platform_family unless attribute?(get_platform_family)
   end
 end

@@ -14,11 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-Ohai.plugin do
+Ohai.plugin(:Rackspace) do
   provides "rackspace"
 
   depends "kernel"
-  depends "network", "counters/network"
+  depends "network/interfaces"
 
   # Checks for matching rackspace kernel name
   #

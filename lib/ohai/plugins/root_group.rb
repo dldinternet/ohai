@@ -15,18 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-Ohai.plugin do
+Ohai.plugin(:RootGroup) do
   provides 'root_group'
 
-  collect_data do
-    case ::RbConfig::CONFIG['host_os']
-    when /mswin|mingw32|windows/
-      # TODO: OHAI-491
-      # http://tickets.opscode.com/browse/OHAI-491
-      # The windows implementation of this plugin has been removed because of
-      # performance considerations (see: OHAI-490).
-    else
-      root_group Etc.getgrgid(Etc.getpwnam('root').gid).name
-    end
+  collect_data(:default) do
+    root_group Etc.getgrgid(Etc.getpwnam('root').gid).name
+  end
+
+  collect_data(:windows) do
+    # The windows implementation of this plugin has been removed
+    # because of performance considerations (see: OHAI-490
   end
 end
+

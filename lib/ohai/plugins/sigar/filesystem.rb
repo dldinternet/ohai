@@ -18,10 +18,10 @@
 
 require "sigar"
 
-Ohai.plugin do
+Ohai.plugin(:Filesystem) do
   provides "filesystem"
 
-  collect_data do
+  collect_data(:aix, :hpux, :sigar) do
     fs = Mash.new
 
     sigar = Sigar.new

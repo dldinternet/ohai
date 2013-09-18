@@ -18,10 +18,10 @@
 
 require "sigar"
 
-Ohai.plugin do
+Ohai.plugin(:NetworkRoute) do
   depends "network"
 
-  provides "network"
+  provides "network/interfaces"
 
   def flags(flags)
     f = ""

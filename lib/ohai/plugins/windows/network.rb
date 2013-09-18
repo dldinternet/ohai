@@ -16,9 +16,7 @@
 # limitations under the License.
 #
 
-require 'ruby-wmi'
-
-Ohai.plugin do
+Ohai.plugin(:Network) do
   provides "network"
 
   def encaps_lookup(encap)
@@ -26,7 +24,9 @@ Ohai.plugin do
     encap
   end
 
-  collect_data do
+  collect_data(:windows) do
+    require 'ruby-wmi'
+
     iface = Mash.new
     iface_config = Mash.new
     iface_instance = Mash.new

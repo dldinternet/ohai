@@ -25,6 +25,10 @@ describe Ohai::System, "plugin azure" do
     @plugin = get_plugin("azure")
   end
 
+  after(:each) do
+    Ohai::NamedPlugin.send(:remove_const, :Azure)
+  end
+
   describe "with azure cloud file" do
     before(:each) do
       File.stub(:exist?).with('/etc/chef/ohai/hints/azure.json').and_return(true)

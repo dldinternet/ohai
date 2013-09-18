@@ -18,13 +18,13 @@
 
 require "ohai"
 
-Ohai.plugin do
+Ohai.plugin(:Ohai) do
   provides "ohai"
 
   collect_data do
-    self[:chef_packages] = Mash.new unless self[:chef_packages]
-    self[:chef_packages][:ohai] = Mash.new
-    self[:chef_packages][:ohai][:version] = Ohai::VERSION
-    self[:chef_packages][:ohai][:ohai_root] = Ohai::OHAI_ROOT
+    chef_packages] = Mash.new unless chef_packages
+    chef_packages[:ohai] = Mash.new
+    chef_packages[:ohai][:version] = ::Ohai::VERSION
+    chef_packages[:ohai][:ohai_root] = ::Ohai::OHAI_ROOT
   end
 end

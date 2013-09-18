@@ -17,8 +17,10 @@
 #
 
 require "sigar"
+require 'ohai/common/platform'
 
 Ohai.plugin do
+  include Ohai::Common::Platform
   provides "platform", "platform_version"
 
   collect_data do
@@ -26,5 +28,9 @@ Ohai.plugin do
 
     platform sys.name.downcase
     platform_version sys.version
+
+    platform get_platform unless attribute?(platform)
+    platform_version get_platform_version unless attribute?(platform_version)
+    platform_family get_platform_family unless attribute?(platform_family)
   end
 end

@@ -14,8 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-Ohai.plugin do
+Ohai.plugin(:Cloud) do
   provides "cloud"
+  provides "cloud/public_ips", "cloud/private_ips"
 
   depends "ec2"
   depends "gce"

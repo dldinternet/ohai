@@ -26,6 +26,10 @@ describe Ohai::System, "plugin ec2" do
     @plugin[:network] = {:interfaces => {:eth0 => {} } }
   end
 
+  after(:each) do
+    Ohai::NamedPlugin.send(:remove_const, :Ec2)
+  end
+
   shared_examples_for "!ec2" do
     it "should NOT attempt to fetch the ec2 metadata" do
       @plugin.should_not_receive(:http_client)

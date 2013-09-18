@@ -24,12 +24,21 @@ module Ohai
 
   # for plugin namespacing
   module NamedPlugin
+    if Module.method(:const_defined?).arity == 1
+      def self.strict_const_defined?(const)
+        const_defined?(const)
+      end
+    else
+      def self.strict_const_defined?(const)
+        const_defined?(const, false)
+      end
+    end
   end
 
   def self.plugin(name, &block)
     plugin = nil
     plugin_name = nameify(name)
-    if NamedPlugin.const_defined?(plugin_name)
+    if NamedPlugin.strict_const_defined?(plugin_name)
       plugin = NamedPlugin.const_get(plugin_name)
       if plugin.version.eql?(:version6)
         Ohai::Log.debug("Already loaded plugin #{plugin_name.to_s}")
@@ -46,7 +55,7 @@ module Ohai
   def self.v6plugin(name, &block)
     plugin = nil
     plugin_name = nameify(name)
-    if NamedPlugin.const_defined?(plugin_name)
+    if NamedPlugin.strict_const_defined?(plugin_name)
       plugin = NamedPlugin.const_get(plugin_name)
       Ohai::Log.debug("Already loaded plugin #{plugin_name.to_s}")
     else
@@ -224,7 +233,7 @@ module Ohai
         end
 
         def require_plugin(*args)
-          @controller.require_plugin(args)
+          @controller.require_plugin(*args)
         end
 
       end

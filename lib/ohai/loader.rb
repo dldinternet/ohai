@@ -28,7 +28,8 @@ module Ohai
       @attributes = controller.attributes
     end
 
-    def load_plugin(plugin_path)
+    # plugin_name is used only to name v6 plugins
+    def load_plugin(plugin_path, plugin_name = nil)
       plugin = nil
 
       contents = ""
@@ -55,7 +56,7 @@ module Ohai
         collect_provides(plugin)
       else
         Ohai::Log.warn("[DEPRECATION] Plugin at #{plugin_path} is a version 6 plugin. Version 6 plugins will not be supported in future releases of Ohai. Please upgrage your plugin to version 7 plugin syntax. For more information visit here: XXX")
-        klass = Ohai.v6plugin { collect_contents(contents) }
+        klass = Ohai.v6plugin(plugin_name) { collect_contents(contents) }
         plugin = klass.new(@controller, plugin_path)
       end
 

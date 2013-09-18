@@ -1,4 +1,4 @@
-Ohai.plugin do
+Ohai.plugin(:V7message) do
   provides 'v7message'
 
   collect_data do

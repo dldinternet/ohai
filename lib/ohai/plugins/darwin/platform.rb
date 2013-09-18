@@ -16,10 +16,14 @@
 # limitations under the License.
 #
 
-Ohai.plugin do
+require 'ohai/common/platform'
+
+Ohai.plugin(:Platform) do
+  include Ohai::Common::Platform
+
   provides "platform", "platform_version", "platform_build", "platform_family"
 
-  collect_data do
+  collect_data(:darwin) do
     so = shell_out("#{ Ohai.abs_path( "/usr/bin/sw_vers" )}")
     so.stdout.lines do |line|
       case line
@@ -36,5 +40,9 @@ Ohai.plugin do
     end
 
     platform_family "mac_os_x"
+
+    platform get_platform unless attribute?(platform)
+    platform_version get_platform_version unless attribute?(platform_version)
+    platform_family get_platform_family unless attribute?(platform_family)
   end
 end

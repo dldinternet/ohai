@@ -18,8 +18,9 @@
 
 require 'ipaddr'
 
-Ohai.plugin do
-  provides "network", "counters/network"
+Ohai.plugin(:Network) do
+  provides "network", "network/interfaces"
+  provides "counters", "counters/network", "counters/network/interfaces"
   provides "ipaddress", "ip6address", "macaddress"
 
   def encaps_lookup(encap)
@@ -33,7 +34,7 @@ Ohai.plugin do
     encap
   end
 
-  collect_data do
+  collect_data(:linux) do
     iface = Mash.new
     net_counters = Mash.new
 

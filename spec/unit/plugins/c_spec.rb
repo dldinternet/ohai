@@ -122,6 +122,10 @@ describe Ohai::System, "plugin c" do
     @plugin.stub(:shell_out).with("what /opt/ansic/bin/cc").and_return(mock_shell_out(0, C_HPUX, ""))
   end
 
+  after(:each) do
+    Ohai::NamedPlugin.send(:remove_const, :C)
+  end
+
   #gcc
   it "should get the gcc version from running gcc -v" do
     @plugin.should_receive(:shell_out).with("gcc -v").and_return(mock_shell_out(0, "", C_GCC))

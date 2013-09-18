@@ -20,8 +20,9 @@
 
 require "sigar"
 
-Ohai.plugin do
-  provides "network", "counters/network"
+Ohai.plugin(:Network) do
+  provides "network", "network/interfaces"
+  provides "counters", "counters/network", "counters/network/interfaces"
 
   def encaps_lookup(encap)
     return "Loopback" if encap.eql?("Local Loopback")
@@ -33,7 +34,7 @@ Ohai.plugin do
     encap
   end
 
-  collect_data do
+  collect_data(:aix, :hpux, :sigar) do
     sigar = Sigar.new
     network Mash.new unless network
     network[:interfaces] = Mash.new unless network[:interfaces]

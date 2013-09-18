@@ -20,11 +20,14 @@ require 'ohai/loader'
 require 'ohai/log'
 require 'ohai/mash'
 require 'ohai/runner'
+
 require 'ohai/dsl/plugin'
-require 'ohai/mixin/os'
-require 'ohai/mixin/from_file'
+
 require 'ohai/mixin/command'
+require 'ohai/mixin/from_file'
+require 'ohai/mixin/os'
 require 'ohai/mixin/string'
+
 require 'mixlib/shellout'
 
 require 'yajl'
@@ -55,14 +58,16 @@ module Ohai
       Ohai::Config[:plugin_path].each do |path|
         [
          Dir[File.join(path, '*')],
-         Dir[File.join(path, Ohai::OS.collect_os, '**', '*')]
+         Dir[File.join(path, Ohai::Mixin::Os.collect_os, '**', '*')]
         ].flatten.each do |file|
           file_regex = Regexp.new("#{File.expand_path(path)}#{File::SEPARATOR}(.+).rb$")
           md = file_regex.match(file)
           if md
             plugin_name = md[1].gsub(File::SEPARATOR, "::")
             unless @v6_dependency_solver.has_key?(plugin_name)
-              plugin = @loader.load_plugin(file)
+              # plugin_name is used only in naming v6 plugins.
+              # v7 plugins use the name provided by the plugin
+              plugin = @loader.load_plugin(file, plugin_name)
               @v6_dependency_solver[plugin_name] = plugin unless plugin.nil?
             else
               Ohai::Log.debug("Already loaded plugin at #{file}")

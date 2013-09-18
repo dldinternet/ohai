@@ -16,10 +16,11 @@
 # limitations under the License.
 #
 
-require 'rbconfig'
-
-Ohai.plugin do
+Ohai.plugin(:C) do
   provides "languages/c"
+  %w{ gcc glibc cl vs xlc sunpro hpcc }.each do |attr|
+    provides "languages/c/#{attr}"
+  end
 
   depends "languages"
 

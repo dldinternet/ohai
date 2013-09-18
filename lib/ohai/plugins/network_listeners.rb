@@ -18,10 +18,10 @@
 
 require 'sigar'
 
-Ohai.plugin do
+Ohai.plugin(:NetworkListeners) do
   provides "network/listeners"
 
-  depends "network", "counters/network"
+  depends "network"
 
   flags = Sigar::NETCONN_TCP|Sigar::NETCONN_SERVER
 

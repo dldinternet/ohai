@@ -66,7 +66,7 @@ module Ohai
         attrs = @attributes
         parts = attribute.split('/')
         parts.each do |part|
-          next if part == Ohai::OS.collect_os
+          next if part == Ohai::Mixin::Os.collect_os
           raise NoAttributeError, "Cannot find plugin providing attribute \'#{attribute}\'" unless attrs[part]
           attrs = attrs[part]
         end
@@ -83,7 +83,7 @@ module Ohai
     def cycle_sources(plugins, cycle_start)
       cycle = plugins.drop_while { |plugin| !plugin.eql?(cycle_start) }
       sources = []
-      cycle.each { |plugin| sources << plugin.source }
+      cycle.each { |plugin| sources << plugin.file }
       sources
     end
 

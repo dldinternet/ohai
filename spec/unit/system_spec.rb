@@ -41,19 +41,21 @@ describe "Ohai::System" do
   describe "#load_plugins" do
     before(:each) do
       @plugin_path = Ohai::Config[:plugin_path]
-      Ohai::OS.stub(:collect_os).and_return("ubuntu")
 
       loader = double('@loader')
       Ohai::Loader.stub(:new) { loader }
 
       @ohai = Ohai::System.new
-      klass = Ohai.plugin { }
+      klass = Ohai.plugin(:Empty) { }
       plugin = klass.new(@ohai, "/tmp/plugins/empty.rb")
-      loader.stub(:load_plugin).with("/tmp/plugins/empty.rb").and_return(plugin)
+
+      loader.stub(:load_plugin).with("/tmp/plugins/empty.rb", anything()).and_return(plugin)
+      Ohai::Mixin::Os.stub(:collect_os).and_return("ubuntu")
     end
 
     after(:each) do
       Ohai::Config[:plugin_path] = @plugin_path
+      Ohai::NamedPlugin.send(:remove_const, :Empty)
     end
 
     it "should load plugins when plugin_path has a trailing slash" do
@@ -75,7 +77,6 @@ describe "Ohai::System" do
 
     it "should add loaded plugins to @v6_dependency_solver" do
       Ohai::Config[:plugin_path] = ["/tmp/plugins"]
-      Ohai::OS.stub(:collect_os).and_return("ubuntu")
       Dir.should_receive(:[]).with("/tmp/plugins/*").and_return(["/tmp/plugins/empty.rb"])
       Dir.should_receive(:[]).with("/tmp/plugins/ubuntu/**/*").and_return([])
       File.stub(:expand_path).with("/tmp/plugins").and_return("/tmp/plugins")
@@ -88,15 +89,16 @@ describe "Ohai::System" do
     describe "with v6 plugins only" do
       before(:each) do
         @ohai = Ohai::System.new
-        @klass = Ohai.v6plugin { collect_contents("") }
 
+        @names = ["one", "two", "three", "four", "five"]
         @plugins = []
-        5.times do |x|
-          @plugins << @klass.new(@ohai, "/tmp/plugins/plugin#{x}.rb")
+        @names.each do |name|
+          k = Ohai.v6plugin(name) { collect_contents("") }
+          @plugins << k.new(@ohai, "/tmp/plugins/#{name}.rb")
         end
 
-        ['one', 'two', 'three', 'four', 'five'].each_with_index do |plugin_name, idx|
-          @ohai.v6_dependency_solver[plugin_name] = @plugins[idx]
+        @names.each_with_index do |name, idx|
+          @ohai.v6_dependency_solver[name] = @plugins[idx]
         end
 
         @ohai.stub(:collect_providers).and_return([])
@@ -104,6 +106,15 @@ describe "Ohai::System" do
 
       after(:each) do
         @ohai.v6_dependency_solver.clear
+
+        @symbols = []
+        @names.each do |name|
+          @symbols << Ohai.nameify(name)
+        end
+
+        @symbols.each do |symbol|
+          Ohai::NamedPlugin.send(:remove_const, symbol)
+        end
       end
 
       it "should run all version 6 plugins" do
@@ -130,9 +141,14 @@ describe "Ohai::System" do
           Ohai::Runner.stub(:new) { @runner }
 
           @ohai = Ohai::System.new
-          klass = Ohai.plugin { }
+          @name = :Empty
+          klass = Ohai.plugin(@name) { }
           plugin = klass.new(@ohai, "/tmp/plugins/empty.rb")
           @ohai.stub(:collect_providers).and_return([plugin])
+        end
+
+        after(:each) do
+          Ohai::NamedPlugin.send(:remove_const, @name)
         end
 
         describe "when a NoAttributeError is received" do
@@ -152,13 +168,20 @@ describe "Ohai::System" do
 
         @ohai = Ohai::System.new
 
-        klass = Ohai.plugin { provides("itself"); collect_data { itself("me") } }
         @plugins = []
-        5.times do |x|
-          @plugins << klass.new(@ohai, "/tmp/plugins/plugin#{x}.rb")
+        @names = [:One, :Two, :Three, :Four, :Five]
+        @names.each do |name|
+          k = Ohai.plugin(name) { provides("itself"); collect_data { itself("me") } }
+          @plugins << k.new(@ohai, "/tmp/plugins/#{name.to_s.downcase}.rb")
         end
 
         @ohai.stub(:collect_providers).and_return(@plugins)
+      end
+
+      after(:each) do
+        @names.each do |name|
+          Ohai::NamedPlugin.send(:remove_const, name)
+        end
       end
 
       it "should run each plugin once from Ohai::System" do
@@ -183,6 +206,9 @@ describe "Ohai::System" do
 
       after(:each) do
         Ohai::Config[:plugin_path] = @plugin_path
+        [:Messages, :V6message, :V7message].each do |name|
+          Ohai::NamedPlugin.send(:remove_const, name)
+        end
       end
 
       it "should run each plugin" do
@@ -210,10 +236,17 @@ describe "Ohai::System" do
     before(:each) do
       @ohai = Ohai::System.new
 
-      klass = Ohai.plugin { }
       @plugins = []
-      4.times do
+      @names = [:Zero, :One, :Two, :Three]
+      @names.each do |name|
+        klass = Ohai.plugin(name) { }
         @plugins << klass.new(@ohai, "")
+      end
+    end
+
+    after(:each) do
+      @names.each do |name|
+        Ohai::NamedPlugin.send(:remove_const, name)
       end
     end
 
@@ -243,7 +276,8 @@ describe "Ohai::System" do
       Ohai::Config[:plugin_path] = ["/tmp/plugins"]
 
       @ohai = Ohai::System.new
-      klass = Ohai.v6plugin { }
+      @name = :Empty
+      klass = Ohai.v6plugin(@name) { }
       @plugin = klass.new(@ohai, "/tmp/plugins/empty.rb")
 
       @ohai.stub(:plugin_for).with("empty").and_return(@plugin)
@@ -251,6 +285,7 @@ describe "Ohai::System" do
 
     after(:each) do
       Ohai::Config[:plugin_path] = @plugin_path
+      Ohai::NamedPlugin.send(:remove_const, @name)
     end
 
     it "should immediately return if force is false and the plugin has already run" do
@@ -317,8 +352,10 @@ provides 'v6attr'
 require_plugin 'v7plugin'
 v6attr message
 EOF
-        v6klass = Ohai.v6plugin { collect_contents(v6string) }
-        v7klass = Ohai.plugin { provides("message"); collect_data { message("hey.") } }
+        @v6name = :V6plugin
+        @v7name = :V7plugin
+        v6klass = Ohai.v6plugin(@v6name) { collect_contents(v6string) }
+        v7klass = Ohai.plugin(@v7name) { provides("message"); collect_data { message("hey.") } }
         @v6plugin = v6klass.new(@ohai, "/tmp/plugins/v6plugin.rb")
         @v7plugin = v7klass.new(@ohai, "/tmp/plugins/v7plugin.rb")
 
@@ -326,6 +363,12 @@ EOF
         @ohai.v6_dependency_solver['v7plugin'] = @v7plugin
         @ohai.attributes[:message] = Mash.new
         @ohai.attributes[:message][:providers] = [@v7plugin]
+      end
+
+      after(:each) do
+        [@v6name, @v7name].each do |name|
+          Ohai::NamedPlugin.send(:remove_const, name)
+        end
       end
 
       it "should run the plugin it requires" do
@@ -350,9 +393,12 @@ provides 'v6attr'
 require_plugin 'v7plugin'
 v6attr message
 EOF
-        v6klass = Ohai.v6plugin { collect_contents(v6string) }
-        v7klass = Ohai.plugin { provides("message"); depends("other"); collect_data{ message(other) } }
-        otherklass = Ohai.plugin { provides("other"); collect_data{ other("o hai") } }
+        @v6name = :V6plugin
+        @v7name = :V7plugin
+        @othername = :Other
+        v6klass = Ohai.v6plugin(@v6name) { collect_contents(v6string) }
+        v7klass = Ohai.plugin(@v7name) { provides("message"); depends("other"); collect_data{ message(other) } }
+        otherklass = Ohai.plugin(@othername) { provides("other"); collect_data{ other("o hai") } }
 
         @v6plugin = v6klass.new(@ohai, "/tmp/plugin/v6plugin.rb")
         @v7plugin = v7klass.new(@ohai, "/tmp/plugins/v7plugin.rb")
@@ -368,6 +414,12 @@ EOF
         a[:message][:providers] = [@v7plugin]
         a[:other] = Mash.new
         a[:other][:providers] = [@other]
+      end
+
+      after(:each) do
+        [@v6name, @v7name, @othername].each do |name|
+          Ohai::NamedPlugin.send(:remove_const, name)
+        end
       end
 
       it "should resolve the v7 plugin dependencies" do
@@ -399,11 +451,13 @@ EOF
       Ohai::Loader.stub(:new) { @loader }
 
       @ohai = Ohai::System.new
-      @klass = Ohai.v6plugin { }
+      @name = :Empty
+      @klass = Ohai.v6plugin(@name) { }
     end
 
     after(:each) do
       Ohai::Config[:plugin_path] = @plugin_path
+      Ohai::NamedPlugin.send(:remove_const, @name)
     end
 
     it "should find a plugin with a simple name" do

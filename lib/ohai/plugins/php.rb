@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 
-Ohai.plugin do
+Ohai.plugin(:Php) do
   provides "languages/php"
 
   depends "languages"

@@ -16,9 +16,11 @@
 # limitations under the License.
 #
 
-require "ohai/plugins/dmi_common"
+require "ohai/common/DMI"
 
-Ohai.plugin do
+Ohai.plugin(:Dmi) do
+  include Ohai::Common::DMI
+
   provides "dmi"
 
   # dmidecode does not return data without access to /dev/mem (or its equivalent)

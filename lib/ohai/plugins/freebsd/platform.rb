@@ -1,6 +1,8 @@
 #
-# Author:: Bryan McLellan (btm@loftninjas.org)
+# Author:: Bryan McLellan (<btm@loftninjas.org>)
+# Author:: Claire McQuin (<claire@opscode.com>)
 # Copyright:: Copyright (c) 2009 Bryan McLellan
+# Copyright:: Copyright (c) 2013 Opscode, Inc.
 # License:: Apache License, Version 2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,13 +18,23 @@
 # limitations under the License.
 #
 
-Ohai.plugin do
+require 'ohai/common/platform'
+
+Ohai.plugin(:Platform) do
+  include Ohai::Common::Platform
   provides "platform", "platform_version"
 
-  collect_data do
-    so = shell_out("uname -s")
-    platform so.stdout.split($/)[0].downcase
-    so = shell_out("uname -r")
-    platform_version so.stdout.split($/)[0]
+  def from_cmd(cmd)
+    so = shell_out(cmd)
+    so.stdout.split($/)[0]
+  end
+
+  collect_data(:freebsd, :netbsd, :openbsd) do
+    platform from_cmd("uname -s").downcase
+    platform_version from_cmd("uname -r")
+
+    platform get_platform unless attribute?(platform)
+    platform_version get_platform_version unless attribute?(platform_version)
+    platform_family get_platform_family unless attribute?(platform_family)
   end
 end

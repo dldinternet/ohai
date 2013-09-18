@@ -16,10 +16,17 @@
 # limitations under the License.
 #
 
-Ohai.plugin do
-  provides "virtualization"
+require 'ohai/common/virtualization'
 
-  collect_data do
+Ohai.plugin(:Virtualization) do
+  include Ohai::Common::Virtualization
+
+  provides "virtualization"
+  %w { capabilities domains networks storage }.each do |subattr|
+    provides "virtualization/#{subattr}"
+  end
+
+  collect_data(:netbsd) do
     virtualization Mash.new
 
     # KVM Host support for FreeBSD is in development
@@ -63,6 +70,20 @@ Ohai.plugin do
           end
         end
       end
+    end
+
+    if host?(virtualization)
+      v = open_virtconn(virtualization[:system])
+
+      virtualization[:libvirt_version] = libvirt_version(v)
+      virtualization[:nodeinfo] = nodeinfo(v)
+      virtualization[:uri] = uri(v)
+      virtualization[:capabilities] = capabilities(v)
+      virtualization[:domains] = domains(v)
+      virtualization[:networks] = networks(v)
+      virtualization[:storage] = storage(v)
+
+      close_virtconn(v)
     end
   end
 end

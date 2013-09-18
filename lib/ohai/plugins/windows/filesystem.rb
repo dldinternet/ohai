@@ -16,12 +16,13 @@
 # limitations under the License.
 #
 
-require 'ruby-wmi'
 
-Ohai.plugin do
+Ohai.plugin(:Filesystem) do
   provides "filesystem"
 
-  collect_data do
+  collect_data(:windows) do
+    require 'ruby-wmi'
+
     fs = Mash.new
     ld_info = Mash.new
 

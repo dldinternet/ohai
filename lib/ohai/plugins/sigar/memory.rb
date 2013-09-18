@@ -18,10 +18,10 @@
 
 require "sigar"
 
-Ohai.plugin do
-  provides "memory"
+Ohai.plugin(:Memory) do
+  provides "memory", "memory/swap"
 
-  collect_data do
+  collect_data(:aix, :hpux, :sigar) do
     sigar = Sigar.new
 
     memory Mash.new

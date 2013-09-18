@@ -18,10 +18,10 @@
 
 require "sigar"
 
-Ohai.plugin do
+Ohai.plugin(:cpu) do
   provides "cpu"
 
-  collect_data do
+  collect_data(:aix, :hpux, :sigar) do
     sigar = Sigar.new
 
     cpuinfo = Mash.new

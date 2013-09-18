@@ -70,7 +70,7 @@ describe Ohai::Loader do
 
     it "should warn if a plugin cannot be loaded" do
       Ohai::Log.should_receive(:warn).with(/Unable to open or read plugin/)
-      @loader.load_plugin("fake.rb")
+      @loader.load_plugin("fake.rb", "fake")
     end
 
     it "should detect and return a v6 plugin" do
@@ -78,27 +78,29 @@ describe Ohai::Loader do
 provides "thing"
 thing Mash.new
 EOF
-      create_plugin("#{tmp}/plugins/v6.rb", plugin_string)
+      create_plugin("#{tmp}/plugins/six.rb", plugin_string)
       Ohai::Log.should_receive(:warn).with(/[DEPRECATION]/)
-      @loader.load_plugin("#{tmp}/plugins/v6.rb").version.should eql(:version6)
+      @loader.load_plugin("#{tmp}/plugins/six.rb", "six").version.should eql(:version6)
+      Ohai::NamedPlugin.send(:remove_const, :Six)
     end
 
     it "should detect and return a v7 plugin" do
       plugin_string = <<EOF
-Ohai.plugin do
+Ohai.plugin(:Seven) do
   provides "thing"
   collect_data do
     thing Mash.new
   end
 end
 EOF
-      create_plugin("#{tmp}/plugins/v7.rb", plugin_string)
-      @loader.load_plugin("#{tmp}/plugins/v7.rb").version.should eql(:version7)
+      create_plugin("#{tmp}/plugins/seven.rb", plugin_string)
+      @loader.load_plugin("#{tmp}/plugins/seven.rb").version.should eql(:version7)
+      Ohai::NamedPlugin.send(:remove_const, :Seven)
     end
 
     it "should warn with NoMethodError when plugin uses non-dsl command" do
       plugin_string = <<EOF
-Ohai.plugin do
+Ohai.plugin(:Broken) do
   requires "thing"
 end
 EOF
@@ -112,17 +114,22 @@ EOF
     before(:each) do
       @ohai = Ohai::System.new
       @loader = Ohai::Loader.new(@ohai)
+      @name = :Test
+    end
+
+    after(:each) do
+      Ohai::NamedPlugin.send(:remove_const, @name)
     end
 
     it "should add a provided attribute to ohai attributes" do
-      klass = Ohai.plugin { provides 'attribute' }
+      klass = Ohai.plugin(@name) { provides 'attribute' }
       plugin = klass.new(@ohai, "")
       @loader.collect_provides(plugin)
       @ohai.attributes.should have_key('attribute')
     end
 
     it "should add subattributes" do
-      klass = Ohai.plugin { provides 'attribute/subattribute' }
+      klass = Ohai.plugin(@name) { provides 'attribute/subattribute' }
       plugin = klass.new(@ohai, "")
       @loader.collect_provides(plugin)
       @ohai.attributes.should have_key('attribute')
@@ -130,7 +137,7 @@ EOF
     end
 
     it "should collect provides for a list" do
-      klass = Ohai.plugin { provides 'one', 'two', 'three' }
+      klass = Ohai.plugin(@name) { provides 'one', 'two', 'three' }
       plugin = klass.new(@ohai, "")
       @loader.collect_provides(plugin)
       %w{ one two three }.each do |attr|
@@ -139,7 +146,7 @@ EOF
     end
 
     it "should add the providing plugin to attribute providers" do
-      klass = Ohai.plugin { provides 'attribute' }
+      klass = Ohai.plugin(@name) { provides 'attribute' }
       plugin = klass.new(@ohai, "")
       @loader.collect_provides(plugin)
       @ohai.attributes['attribute']['providers'].should eql([plugin])
@@ -147,15 +154,15 @@ EOF
 
     it "should add to the providers list for multiple providing plugins" do
       klasses = []
-      2.times do
-        klasses << Ohai.plugin { provides 'attribute' }
-      end
+      klasses << Ohai.plugin(@name) { provides 'attribute' }
+      klasses << Ohai.plugin(:Other) { provides 'attribute' }
 
       plugins = []
       klasses.each { |klass| plugins << klass.new(@ohai, "") }
       plugins.each { |plugin| @loader.collect_provides(plugin) }
 
       @ohai.attributes['attribute']['providers'].should eql(plugins)
+      Ohai::NamedPlugin.send(:remove_const, :Other)
     end
   end
 end
